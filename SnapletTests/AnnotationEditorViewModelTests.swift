@@ -107,4 +107,41 @@ final class AnnotationEditorViewModelTests: XCTestCase {
         guard case .arrow(let widened) = viewModel.annotations.first else { return XCTFail("expected arrow") }
         XCTAssertEqual(widened.lineWidth, 30)
     }
+
+    func testUpdateTextEditsInPlace() {
+        let viewModel = AnnotationEditorViewModel()
+        let text = Annotation.text(TextBox(origin: CGPoint(x: 10, y: 10), text: "before", color: .black))
+        viewModel.append(text)
+
+        viewModel.updateText(id: text.id, to: "after")
+
+        XCTAssertEqual(viewModel.annotations.first?.textContent, "after")
+    }
+
+    func testRemoveAnnotationClearsSelection() {
+        let viewModel = AnnotationEditorViewModel()
+        let text = Annotation.text(TextBox(origin: CGPoint(x: 10, y: 10), text: "x", color: .black))
+        viewModel.append(text)
+        viewModel.selectedAnnotationID = text.id
+
+        viewModel.removeAnnotation(id: text.id)
+
+        XCTAssertTrue(viewModel.annotations.isEmpty)
+        XCTAssertNil(viewModel.selectedAnnotationID)
+    }
+
+    func testSetFontSizeAndNameRestyleSelectedText() {
+        let viewModel = AnnotationEditorViewModel()
+        let text = Annotation.text(TextBox(origin: .zero, text: "x", color: .black, fontSize: 24))
+        viewModel.append(text)
+        viewModel.selectedAnnotationID = text.id
+
+        viewModel.setFontSize(48)
+        viewModel.setFontName("Georgia")
+
+        XCTAssertEqual(viewModel.annotations.first?.fontSize, 48)
+        XCTAssertEqual(viewModel.annotations.first?.fontName, "Georgia")
+        XCTAssertEqual(viewModel.selectedFontSize, 48)
+        XCTAssertEqual(viewModel.selectedFontName, "Georgia")
+    }
 }

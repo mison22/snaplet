@@ -69,6 +69,22 @@ enum AppConstants {
     /// resolution.
     static let annotationLineWidths: [CGFloat] = [6, 14, 26, 42]
 
+    /// Preset text/bubble font sizes offered in the editor, in native pixels.
+    static let annotationFontSizes: [CGFloat] = [16, 24, 36, 48, 64, 96]
+
+    /// Curated font families offered for text and bubbles. The system font is
+    /// offered separately (a `nil` family), so it isn't listed here. Each name
+    /// is a macOS family name resolvable via `NSFontManager`.
+    static let annotationFontNames: [String] = [
+        "Helvetica Neue",
+        "Avenir Next",
+        "Georgia",
+        "Times New Roman",
+        "Menlo",
+        "Marker Felt",
+        "Snell Roundhand",
+    ]
+
     // MARK: - Save location
 
     /// Default folder screenshots are written to: `~/Pictures/Screenshots`.

@@ -71,6 +71,85 @@ enum Annotation: Identifiable {
         return .arrow(arrow)
     }
 
+    /// The editable text of this annotation, or `nil` for kinds that carry no
+    /// text (arrows). Used to decide whether double-click-to-edit applies.
+    var textContent: String? {
+        switch self {
+        case .arrow:
+            return nil
+        case .text(let textBox):
+            return textBox.text
+        case .bubble(let speechBubble):
+            return speechBubble.text
+        }
+    }
+
+    /// Returns a copy with its text replaced, preserving all geometry and
+    /// styling. A no-op for kinds without text.
+    func withText(_ text: String) -> Annotation {
+        switch self {
+        case .arrow:
+            return self
+        case .text(var textBox):
+            textBox.text = text
+            return .text(textBox)
+        case .bubble(var speechBubble):
+            speechBubble.text = text
+            return .bubble(speechBubble)
+        }
+    }
+
+    /// The font size of a textual annotation, or `nil` for arrows.
+    var fontSize: CGFloat? {
+        switch self {
+        case .arrow: return nil
+        case .text(let textBox): return textBox.fontSize
+        case .bubble(let speechBubble): return speechBubble.fontSize
+        }
+    }
+
+    /// The font family of a textual annotation (`nil` for the system font or
+    /// for arrows). Returns `.some(nil)` for textual annotations using the
+    /// system font, `.none` for arrows -- callers that only care about
+    /// textual kinds can treat both as "no explicit family".
+    var fontName: String? {
+        switch self {
+        case .arrow: return nil
+        case .text(let textBox): return textBox.fontName
+        case .bubble(let speechBubble): return speechBubble.fontName
+        }
+    }
+
+    /// Returns a copy with `fontSize` applied to textual kinds; a no-op for
+    /// arrows.
+    func withFontSize(_ fontSize: CGFloat) -> Annotation {
+        switch self {
+        case .arrow:
+            return self
+        case .text(var textBox):
+            textBox.fontSize = fontSize
+            return .text(textBox)
+        case .bubble(var speechBubble):
+            speechBubble.fontSize = fontSize
+            return .bubble(speechBubble)
+        }
+    }
+
+    /// Returns a copy with `fontName` applied to textual kinds; a no-op for
+    /// arrows.
+    func withFontName(_ fontName: String?) -> Annotation {
+        switch self {
+        case .arrow:
+            return self
+        case .text(var textBox):
+            textBox.fontName = fontName
+            return .text(textBox)
+        case .bubble(var speechBubble):
+            speechBubble.fontName = fontName
+            return .bubble(speechBubble)
+        }
+    }
+
     /// Renders this annotation into `context`.
     ///
     /// - Parameter context: A `CGContext` using the flipped, top-left-origin
@@ -302,19 +381,34 @@ struct TextBox: Identifiable {
     var text: String
     var color: NSColor
     var fontSize: CGFloat
+    /// The font family name, or `nil` for the system font.
+    var fontName: String?
 
-    init(origin: CGPoint, text: String, color: NSColor, fontSize: CGFloat = TextBox.defaultFontSize) {
+    init(origin: CGPoint, text: String, color: NSColor, fontSize: CGFloat = TextBox.defaultFontSize, fontName: String? = nil) {
         self.origin = origin
         self.text = text
         self.color = color
         self.fontSize = fontSize
+        self.fontName = fontName
     }
+
+    /// Resolves `name` (a family name, or `nil` for the system font) to a
+    /// concrete `NSFont` at `size`, falling back to the system font if the
+    /// family is unavailable.
+    static func font(name: String?, size: CGFloat) -> NSFont {
+        guard let name else { return .systemFont(ofSize: size) }
+        return NSFontManager.shared.font(withFamily: name, traits: [], weight: 5, size: size)
+            ?? NSFont(name: name, size: size)
+            ?? .systemFont(ofSize: size)
+    }
+
+    private var resolvedFont: NSFont { TextBox.font(name: fontName, size: fontSize) }
 
     /// Draws `text` with `origin` as its top-left corner, matching the
     /// flipped, top-left-origin convention documented on `Annotation`.
     func draw(in context: CGContext) {
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: fontSize),
+            .font: resolvedFont,
             .foregroundColor: color,
         ]
         let attributedString = NSAttributedString(string: text, attributes: attributes)
@@ -340,7 +434,7 @@ struct TextBox: Identifiable {
     /// `draw(in:)` lays the glyphs out within. Used for hit-testing and the
     /// selection outline.
     var measuredSize: CGSize {
-        let attributedString = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: fontSize)])
+        let attributedString = NSAttributedString(string: text, attributes: [.font: resolvedFont])
         let line = CTLineCreateWithAttributedString(attributedString)
         let bounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
         return CGSize(width: bounds.width, height: bounds.height)
@@ -377,19 +471,23 @@ struct SpeechBubble: Identifiable {
     var text: String
     var color: NSColor
     var fontSize: CGFloat
+    /// The font family name, or `nil` for the system font.
+    var fontName: String?
 
     init(
         bodyRect: CGRect,
         tailTarget: CGPoint,
         text: String,
         color: NSColor,
-        fontSize: CGFloat = TextBox.defaultFontSize
+        fontSize: CGFloat = TextBox.defaultFontSize,
+        fontName: String? = nil
     ) {
         self.bodyRect = bodyRect
         self.tailTarget = tailTarget
         self.text = text
         self.color = color
         self.fontSize = fontSize
+        self.fontName = fontName
     }
 
     func draw(in context: CGContext) {
@@ -407,7 +505,7 @@ struct SpeechBubble: Identifiable {
             x: bodyRect.minX + Self.textInset,
             y: bodyRect.minY + Self.textInset
         )
-        TextBox(origin: textOrigin, text: text, color: color, fontSize: fontSize).draw(in: context)
+        TextBox(origin: textOrigin, text: text, color: color, fontSize: fontSize, fontName: fontName).draw(in: context)
     }
 
     /// Resizes `original` by dragging `corner` to `point`, keeping the

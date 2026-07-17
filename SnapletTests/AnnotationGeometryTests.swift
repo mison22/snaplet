@@ -127,6 +127,30 @@ final class AnnotationGeometryTests: XCTestCase {
         XCTAssertEqual(arrow.withColor(.systemGreen).color, .systemGreen)
     }
 
+    func testWithTextReplacesTextualContent() {
+        let text = Annotation.text(TextBox(origin: .zero, text: "old", color: .black))
+        XCTAssertEqual(text.withText("new").textContent, "new")
+
+        let bubble = Annotation.bubble(SpeechBubble(
+            bodyRect: CGRect(x: 0, y: 0, width: 40, height: 30),
+            tailTarget: .zero, text: "old", color: .systemBlue))
+        XCTAssertEqual(bubble.withText("new").textContent, "new")
+
+        let arrow = Annotation.arrow(Arrow(start: .zero, end: CGPoint(x: 1, y: 1), color: .systemRed))
+        XCTAssertNil(arrow.textContent)
+        XCTAssertNil(arrow.withText("x").textContent)
+    }
+
+    func testWithFontSizeAndNameAffectTextualKindsOnly() {
+        let text = Annotation.text(TextBox(origin: .zero, text: "hi", color: .black, fontSize: 24, fontName: nil))
+        XCTAssertEqual(text.withFontSize(48).fontSize, 48)
+        XCTAssertEqual(text.withFontName("Georgia").fontName, "Georgia")
+
+        let arrow = Annotation.arrow(Arrow(start: .zero, end: CGPoint(x: 1, y: 1), color: .systemRed))
+        XCTAssertNil(arrow.fontSize)
+        XCTAssertEqual(arrow.withFontSize(48).id, arrow.id)
+    }
+
     func testWithLineWidthOnlyAffectsArrows() {
         let text = Annotation.text(TextBox(origin: .zero, text: "x", color: .black))
         // Non-arrows are returned unchanged; this simply must not crash or alter identity.

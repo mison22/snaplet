@@ -59,6 +59,9 @@ struct AnnotationView: View {
                 // drag updates until release, so the arrow/bubble preview
                 // never appeared until the gesture ended.
                 .simultaneousGesture(dragGesture)
+                .onTapGesture(count: 2) { location in
+                    editText(at: location)
+                }
                 .onTapGesture { location in
                     handleTap(at: location)
                 }
@@ -82,7 +85,10 @@ struct AnnotationView: View {
     // MARK: - Drawing
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
-        for annotation in viewModel.annotations {
+        // Skip the annotation being edited in place; its live text shows in the
+        // overlaid text field instead, so drawing it too would double up.
+        let editingID = viewModel.textDraft?.editingID
+        for annotation in viewModel.annotations where annotation.id != editingID {
             drawPreview(of: annotation, in: &context)
         }
 
@@ -196,6 +202,16 @@ struct AnnotationView: View {
         CGPoint(x: point.x / scale.width, y: point.y / scale.height)
     }
 
+    /// Converts a native-pixel rect back to this view's on-screen point space.
+    private func viewRect(for rect: CGRect) -> CGRect {
+        CGRect(
+            x: rect.origin.x / scale.width,
+            y: rect.origin.y / scale.height,
+            width: rect.width / scale.width,
+            height: rect.height / scale.height
+        )
+    }
+
     /// Which resize handle of the currently selected annotation, if any, is
     /// under `location` (view space) within `handleHitRadius`.
     private func hitTestHandle(at location: CGPoint) -> ResizeHandle.Kind? {
@@ -299,6 +315,35 @@ struct AnnotationView: View {
         }
     }
 
+    /// Double-click (Select tool) on a text or bubble annotation reopens its
+    /// editor pre-filled, positioned over the annotation. Committing updates
+    /// the existing annotation in place; clearing the text deletes it.
+    private func editText(at location: CGPoint) {
+        guard viewModel.selectedTool == .select else { return }
+        let imagePoint = scaleToImage(location)
+        guard let annotation = viewModel.annotation(at: imagePoint), annotation.textContent != nil else { return }
+
+        viewModel.selectedAnnotationID = annotation.id
+        switch annotation {
+        case .text(let textBox):
+            viewModel.textDraft = AnnotationEditorViewModel.TextDraft(
+                kind: .text,
+                anchor: viewPoint(for: textBox.origin),
+                input: textBox.text,
+                editingID: annotation.id
+            )
+        case .bubble(let speechBubble):
+            viewModel.textDraft = AnnotationEditorViewModel.TextDraft(
+                kind: .bubble(bodyRect: viewRect(for: speechBubble.bodyRect)),
+                anchor: viewPoint(for: speechBubble.bodyRect.origin),
+                input: speechBubble.text,
+                editingID: annotation.id
+            )
+        case .arrow:
+            break
+        }
+    }
+
     // MARK: - Text entry
 
     @ViewBuilder
@@ -339,12 +384,31 @@ struct AnnotationView: View {
             // without requiring an extra click first.
             isCanvasFocused = true
         }
-        guard !draft.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let trimmed = draft.input.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Editing an existing annotation: update its text in place, or delete
+        // it if the user cleared the text entirely.
+        if let editingID = draft.editingID {
+            if trimmed.isEmpty {
+                viewModel.removeAnnotation(id: editingID)
+            } else {
+                viewModel.updateText(id: editingID, to: draft.input)
+            }
+            return
+        }
+
+        guard !trimmed.isEmpty else { return }
 
         switch draft.kind {
         case .text:
             let origin = scaleToImage(draft.anchor)
-            viewModel.append(.text(TextBox(origin: origin, text: draft.input, color: viewModel.selectedColor)))
+            viewModel.append(.text(TextBox(
+                origin: origin,
+                text: draft.input,
+                color: viewModel.selectedColor,
+                fontSize: viewModel.selectedFontSize,
+                fontName: viewModel.selectedFontName
+            )))
         case .bubble(let bodyRect):
             let scaledBodyRect = scaleToImage(bodyRect)
             let tailTarget = CGPoint(
@@ -357,7 +421,9 @@ struct AnnotationView: View {
                         bodyRect: scaledBodyRect,
                         tailTarget: tailTarget,
                         text: draft.input,
-                        color: viewModel.selectedColor
+                        color: viewModel.selectedColor,
+                        fontSize: viewModel.selectedFontSize,
+                        fontName: viewModel.selectedFontName
                     )
                 )
             )

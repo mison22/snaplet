@@ -22,6 +22,9 @@ final class AnnotationEditorViewModel: ObservableObject {
     @Published var selectedTool: AnnotationTool = .arrow
     @Published var selectedColor: NSColor = AppConstants.annotationPalette[AnnotationEditorViewModel.defaultColorIndex]
     @Published var selectedLineWidth: CGFloat = Arrow.defaultLineWidth
+    @Published var selectedFontSize: CGFloat = TextBox.defaultFontSize
+    /// Font family for new text/bubbles, or `nil` for the system font.
+    @Published var selectedFontName: String?
 
     /// In-progress arrow drag, tracked in on-screen (view) coordinates so the
     /// live preview can be drawn before the gesture ends.
@@ -50,6 +53,10 @@ final class AnnotationEditorViewModel: ObservableObject {
             if case .arrow(let arrow) = selected {
                 selectedLineWidth = arrow.lineWidth
             }
+            if let fontSize = selected.fontSize {
+                selectedFontSize = fontSize
+                selectedFontName = selected.fontName
+            }
         }
     }
 
@@ -77,6 +84,11 @@ final class AnnotationEditorViewModel: ObservableObject {
         var kind: Kind
         var anchor: CGPoint
         var input: String = ""
+
+        /// When set, committing this draft edits the existing annotation with
+        /// this id (preserving its geometry/styling) rather than creating a
+        /// new one. Set by double-click-to-edit.
+        var editingID: Annotation.ID?
     }
 
     var canUndo: Bool { !annotations.isEmpty }
@@ -171,6 +183,19 @@ final class AnnotationEditorViewModel: ObservableObject {
         selectedAnnotationID = nil
     }
 
+    /// Replaces the text of the annotation with `id`, preserving its geometry
+    /// and styling. Used when committing a double-click edit.
+    func updateText(id: Annotation.ID, to text: String) {
+        guard let index = annotations.firstIndex(where: { $0.id == id }) else { return }
+        annotations[index] = annotations[index].withText(text)
+    }
+
+    /// Removes the annotation with `id` (e.g. when an edit clears its text).
+    func removeAnnotation(id: Annotation.ID) {
+        annotations.removeAll { $0.id == id }
+        if selectedAnnotationID == id { selectedAnnotationID = nil }
+    }
+
     /// Sets the color used for new annotations and, if one is selected,
     /// recolors it too.
     func setColor(_ color: NSColor) {
@@ -184,6 +209,20 @@ final class AnnotationEditorViewModel: ObservableObject {
     func setLineWidth(_ lineWidth: CGFloat) {
         selectedLineWidth = lineWidth
         applyToSelected { $0.withLineWidth(lineWidth) }
+    }
+
+    /// Sets the font size for new text/bubbles and, if a textual annotation is
+    /// selected, resizes it too.
+    func setFontSize(_ fontSize: CGFloat) {
+        selectedFontSize = fontSize
+        applyToSelected { $0.withFontSize(fontSize) }
+    }
+
+    /// Sets the font family (`nil` = system) for new text/bubbles and, if a
+    /// textual annotation is selected, restyles it too.
+    func setFontName(_ fontName: String?) {
+        selectedFontName = fontName
+        applyToSelected { $0.withFontName(fontName) }
     }
 
     private func applyToSelected(_ transform: (Annotation) -> Annotation) {
