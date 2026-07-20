@@ -33,6 +33,7 @@ struct AnnotationActionBar: View {
 
             Button("Copy", action: copyToPasteboard)
                 .controlSize(.large)
+                .keyboardShortcut("c", modifiers: [.command, .shift])
 
             Button("Save", action: save)
                 .controlSize(.large)

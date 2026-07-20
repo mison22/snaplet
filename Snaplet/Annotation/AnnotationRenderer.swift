@@ -25,10 +25,15 @@ enum AnnotationRenderer {
     static func flatten(base: CGImage, annotations: [Annotation]) -> CGImage? {
         let width = base.width
         let height = base.height
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
 
-        guard let context = CGContext(
+        // Flatten in the capture's own color space (Display P3 on a wide-gamut
+        // screen), not a generic device RGB. Redrawing into device RGB clamps
+        // out-of-sRGB colors and strips the profile, so exports look duller
+        // than what was on screen. Fall back to device RGB only if the source
+        // space can't back a bitmap context.
+        let colorSpace = base.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(
             data: nil,
             width: width,
             height: height,
@@ -36,7 +41,16 @@ enum AnnotationRenderer {
             bytesPerRow: width * bytesPerPixel,
             space: colorSpace,
             bitmapInfo: bitmapInfo
-        ) else {
+        ) ?? CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: width * bytesPerPixel,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        )
+        guard let context else {
             return nil
         }
 

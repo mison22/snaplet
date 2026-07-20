@@ -318,17 +318,29 @@ struct Arrow: Identifiable {
         context.saveGState()
         defer { context.restoreGState() }
 
-        context.setStrokeColor(color.cgColor)
-        context.setLineWidth(lineWidth)
-        context.setLineCap(.round)
-
-        context.beginPath()
-        context.move(to: start)
-        context.addLine(to: end)
-        context.strokePath()
-
         let arrowheadLength = lineWidth * Self.arrowheadLengthMultiplier
         let angle = atan2(end.y - start.y, end.x - start.x)
+
+        // End the shaft at the arrowhead's base, not the tip. With a round
+        // line cap, a shaft drawn all the way to `end` bulges a half-circle
+        // past the point; stopping at the base tucks that cap under the
+        // filled head, so the tip reads as a sharp point while the tail keeps
+        // its rounded cap. `baseInset` is the axial distance from tip to the
+        // wing base -- the same distance both wings sit behind the tip.
+        let baseInset = arrowheadLength * cos(Self.arrowheadAngle)
+        let shaftLength = hypot(end.x - start.x, end.y - start.y)
+        if shaftLength > baseInset {
+            let shaftEnd = CGPoint(x: end.x - baseInset * cos(angle), y: end.y - baseInset * sin(angle))
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(lineWidth)
+            context.setLineCap(.round)
+
+            context.beginPath()
+            context.move(to: start)
+            context.addLine(to: shaftEnd)
+            context.strokePath()
+        }
+
         let leftWingAngle = angle + .pi - Self.arrowheadAngle
         let rightWingAngle = angle + .pi + Self.arrowheadAngle
         let leftWing = CGPoint(

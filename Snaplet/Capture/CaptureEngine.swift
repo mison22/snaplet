@@ -51,6 +51,7 @@ final class CaptureEngine {
 
         let filter = SCContentFilter(display: display, excludingWindows: ownWindows(from: content))
         let configuration = SCStreamConfiguration()
+        configuration.colorSpaceName = CGColorSpace.displayP3
         let scale = activeScreen.backingScaleFactor
         configuration.width = Int(CGFloat(display.width) * scale)
         configuration.height = Int(CGFloat(display.height) * scale)
@@ -74,6 +75,7 @@ final class CaptureEngine {
 
         let filter = SCContentFilter(desktopIndependentWindow: chosen)
         let configuration = SCStreamConfiguration()
+        configuration.colorSpaceName = CGColorSpace.displayP3
         let scale = displayScaleFactor(containingQuartzFrame: chosen.frame)
         configuration.width = max(1, Int(chosen.frame.width * scale))
         configuration.height = max(1, Int(chosen.frame.height * scale))
@@ -107,6 +109,7 @@ final class CaptureEngine {
 
         let filter = SCContentFilter(display: display, excludingWindows: ownWindows(from: content))
         let configuration = SCStreamConfiguration()
+        configuration.colorSpaceName = CGColorSpace.displayP3
         let scale = selection.screen.backingScaleFactor
         configuration.sourceRect = sourceRect
         configuration.width = max(1, Int((sourceRect.width * scale).rounded()))
