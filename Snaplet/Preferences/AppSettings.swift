@@ -43,6 +43,16 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Supersample multiplier `CaptureEngine` applies on top of a display's
+    /// native `backingScaleFactor`. Defaults to `.high` since Retina-native
+    /// resolution alone is a common source of soft/grainy screenshots once
+    /// a receiving app scales or zooms them.
+    @Published var captureResolution: CaptureResolution {
+        didSet {
+            defaults.set(captureResolution.rawValue, forKey: AppConstants.DefaultsKey.captureResolution.rawValue)
+        }
+    }
+
     /// - Parameter defaults: The `UserDefaults` domain to read/write.
     ///   Defaults to `.standard`; tests should inject an isolated
     ///   `UserDefaults(suiteName:)` instance instead.
@@ -60,6 +70,13 @@ final class AppSettings: ObservableObject {
             self.hotKeys = decoded
         } else {
             self.hotKeys = HotKeyDefinition.defaults
+        }
+
+        if let storedRawValue = defaults.object(forKey: AppConstants.DefaultsKey.captureResolution.rawValue) as? Int,
+           let decoded = CaptureResolution(rawValue: storedRawValue) {
+            self.captureResolution = decoded
+        } else {
+            self.captureResolution = .high
         }
     }
 

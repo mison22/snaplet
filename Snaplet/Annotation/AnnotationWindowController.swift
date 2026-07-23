@@ -35,9 +35,13 @@ final class AnnotationWindowController: NSWindowController {
     private let baseImage: CGImage
     private let viewModel = AnnotationEditorViewModel()
 
-    /// - Parameter image: The native-resolution capture to annotate. Save and
-    ///   Copy always flatten this image, never a scaled preview.
-    init(image: CGImage) {
+    /// - Parameters:
+    ///   - image: The native-resolution capture to annotate. Save and Copy
+    ///     always flatten this image, never a scaled preview.
+    ///   - captureScale: Pixels-per-point baked into `image`'s dimensions,
+    ///     forwarded to the Copy path so the pasteboard image reports its
+    ///     true point size (see `CapturedImage`).
+    init(image: CGImage, captureScale: CGFloat) {
         self.baseImage = image
 
         let displaySize = Self.fittedDisplaySize(forImage: image)
@@ -66,6 +70,7 @@ final class AnnotationWindowController: NSWindowController {
 
         let rootView = AnnotationEditorContainerView(
             baseImage: image,
+            captureScale: captureScale,
             displaySize: displaySize,
             viewModel: viewModel,
             onRequestClose: { [weak self] in self?.close() }
@@ -123,6 +128,7 @@ private struct AnnotationEditorContainerView: View {
     private static let imageCornerRadius: CGFloat = 8
 
     let baseImage: CGImage
+    let captureScale: CGFloat
     let displaySize: CGSize
     @ObservedObject var viewModel: AnnotationEditorViewModel
     let onRequestClose: () -> Void
@@ -138,7 +144,7 @@ private struct AnnotationEditorContainerView: View {
 
             HStack {
                 Spacer()
-                AnnotationActionBar(baseImage: baseImage, viewModel: viewModel, onRequestClose: onRequestClose)
+                AnnotationActionBar(baseImage: baseImage, captureScale: captureScale, viewModel: viewModel, onRequestClose: onRequestClose)
             }
             .frame(width: displaySize.width)
         }

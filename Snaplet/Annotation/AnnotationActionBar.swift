@@ -15,6 +15,9 @@ struct AnnotationActionBar: View {
     /// image, never a scaled preview, so exported output matches the screen's
     /// native pixel dimensions.
     let baseImage: CGImage
+    /// Pixels-per-point baked into `baseImage`'s dimensions, forwarded to the
+    /// Copy path so the pasteboard image reports its true point size.
+    let captureScale: CGFloat
     @ObservedObject var viewModel: AnnotationEditorViewModel
     let onRequestClose: () -> Void
 
@@ -81,7 +84,7 @@ struct AnnotationActionBar: View {
     // MARK: - Copy
 
     private func copyToPasteboard() {
-        guard let flattenedImage = AnnotationRenderer.flattenToNSImage(base: baseImage, annotations: viewModel.annotations) else {
+        guard let flattenedImage = AnnotationRenderer.flattenToNSImage(base: baseImage, annotations: viewModel.annotations, pointScale: captureScale) else {
             saveErrorMessage = "Couldn't render the annotated screenshot."
             showsSaveError = true
             return

@@ -81,13 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// there is exactly one capture pipeline in the app.
     private func runCapture(_ mode: CaptureMode) {
         Task { @MainActor in
-            guard let image = await captureEngine.capture(mode) else {
+            guard let captured = await captureEngine.capture(mode) else {
                 // Permission failure already alerted inside the engine;
                 // user cancellation (Esc) is a normal no-op.
                 return
             }
 
-            let annotationController = AnnotationWindowController(image: image)
+            let annotationController = AnnotationWindowController(image: captured.cgImage, captureScale: captured.scale)
             guard let window = annotationController.window else { return }
 
             openAnnotationWindowControllers[window] = annotationController

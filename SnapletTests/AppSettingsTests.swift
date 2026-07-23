@@ -60,6 +60,22 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.hotKey(for: .fullScreen), rebind)
     }
 
+    // MARK: - captureResolution
+
+    func testDefaultCaptureResolutionIsHigh() {
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertEqual(settings.captureResolution, .high)
+    }
+
+    func testSettingCaptureResolutionPersistsAndReloads() {
+        let settings = AppSettings(defaults: defaults)
+
+        settings.captureResolution = .maximum
+
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertEqual(reloaded.captureResolution, .maximum)
+    }
+
     // MARK: - actionsConflicting
 
     func testActionsConflictingDetectsCollision() {

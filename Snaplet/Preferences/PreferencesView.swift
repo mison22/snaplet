@@ -17,12 +17,13 @@ struct PreferencesView: View {
     }
 
     private enum Tab: String, CaseIterable, Identifiable {
-        case hotkeys, saveLocation, general
+        case hotkeys, capture, saveLocation, general
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .hotkeys: return "Hotkeys"
+            case .capture: return "Capture"
             case .saveLocation: return "Save Location"
             case .general: return "General"
             }
@@ -31,6 +32,7 @@ struct PreferencesView: View {
         var symbol: String {
             switch self {
             case .hotkeys: return "keyboard"
+            case .capture: return "camera.viewfinder"
             case .saveLocation: return "folder"
             case .general: return "gearshape"
             }
@@ -72,6 +74,8 @@ struct PreferencesView: View {
         switch selection {
         case .hotkeys:
             HotKeysSectionView(settings: settings)
+        case .capture:
+            CaptureSectionView(settings: settings)
         case .saveLocation:
             SaveLocationSectionView(settings: settings)
         case .general:
@@ -199,6 +203,54 @@ private struct HotKeysSectionView: View {
 
     private func names(for actions: [HotKeyAction]) -> String {
         actions.map(title(for:)).joined(separator: ", ")
+    }
+}
+
+// MARK: - Capture
+
+/// Lets the user pick how much supersampling `CaptureEngine` applies on top
+/// of a display's native `backingScaleFactor`. Higher settings trade capture
+/// time and file size for sharper results once a screenshot is zoomed,
+/// scaled, or viewed on a higher-density display than it was captured on.
+private struct CaptureSectionView: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SectionHeader(title: "Image Quality", subtitle: "Resolution used when capturing a screenshot.")
+
+            GroupBox {
+                VStack(spacing: 10) {
+                    ForEach(Array(CaptureResolution.allCases.enumerated()), id: \.element) { index, resolution in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(resolution.title)
+                                Text(resolution.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if settings.captureResolution == resolution {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { settings.captureResolution = resolution }
+                        if index < CaptureResolution.allCases.count - 1 {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(6)
+            }
+
+            Text("Higher settings capture more pixels per shot, so screenshots stay sharp when zoomed in or pasted at a larger size — at the cost of slower captures and larger files.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+        }
     }
 }
 

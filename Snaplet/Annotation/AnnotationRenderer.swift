@@ -76,13 +76,20 @@ enum AnnotationRenderer {
     }
 
     /// Convenience wrapper around `flatten(base:annotations:)` for callers
-    /// (Save/Copy) that want an `NSImage` sized in points at the base
-    /// image's native pixel resolution.
-    static func flattenToNSImage(base: CGImage, annotations: [Annotation]) -> NSImage? {
+    /// (Copy) that want an `NSImage` sized in points at the base image's
+    /// native pixel resolution.
+    ///
+    /// - Parameter pointScale: Pixels-per-point the base image was captured
+    ///   at (`CapturedImage.scale`). `NSImage.size` must be in points, not
+    ///   pixels -- reporting the raw pixel count as the size understates how
+    ///   much pixel data is actually available for a given point size, so a
+    ///   receiving app renders it at the wrong physical size and upscales it
+    ///   on a Retina display, reading as grainy.
+    static func flattenToNSImage(base: CGImage, annotations: [Annotation], pointScale: CGFloat) -> NSImage? {
         guard let flattened = flatten(base: base, annotations: annotations) else {
             return nil
         }
-        let size = NSSize(width: flattened.width, height: flattened.height)
+        let size = NSSize(width: CGFloat(flattened.width) / pointScale, height: CGFloat(flattened.height) / pointScale)
         return NSImage(cgImage: flattened, size: size)
     }
 }

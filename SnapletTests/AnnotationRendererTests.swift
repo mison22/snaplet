@@ -151,6 +151,16 @@ final class AnnotationRendererTests: XCTestCase {
         XCTAssertGreaterThan(bottom.b, bottom.r, "flattened bottom should stay blue (not vertically flipped)")
     }
 
+    func testFlattenToNSImageSizesInPointsNotPixels() {
+        let base = makeWhiteBaseImage()
+
+        let image = AnnotationRenderer.flattenToNSImage(base: base, annotations: [], pointScale: 2)
+
+        XCTAssertNotNil(image)
+        XCTAssertEqual(image?.size.width, CGFloat(base.width) / 2)
+        XCTAssertEqual(image?.size.height, CGFloat(base.height) / 2)
+    }
+
     func testArrowChangesPixelAlongItsPath() {
         let base = makeWhiteBaseImage()
         let size = Self.baseSize

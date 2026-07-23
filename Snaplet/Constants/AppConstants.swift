@@ -117,5 +117,9 @@ enum AppConstants {
         /// not sandboxed, so a plain path (rather than a security-scoped
         /// bookmark) is sufficient — see the note on `AppSettings.saveDirectory`.
         case saveDirectoryPath = "com.mikeison.Snaplet.saveDirectoryPath"
+
+        /// `CaptureResolution.rawValue` (Int) for the supersample multiplier
+        /// applied on top of the display's native `backingScaleFactor`.
+        case captureResolution = "com.mikeison.Snaplet.captureResolution"
     }
 }

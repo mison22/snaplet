@@ -8,15 +8,35 @@ import ScreenCaptureKit
 /// Every call starts by verifying Screen Recording access via
 /// `ScreenRecordingPermission`; if that check fails, `capture(_:)` returns
 /// `nil` immediately without touching ScreenCaptureKit.
+/// A screenshot at native pixel resolution, paired with the pixels-per-point
+/// scale baked into its dimensions (display `backingScaleFactor` times any
+/// `CaptureResolution` supersample factor).
+///
+/// Downstream consumers that size an `NSImage` in points (e.g. the Copy
+/// path's pasteboard image) need this to avoid reporting the pixel count as
+/// if it were the point size — which would make a receiving app request more
+/// pixels than the image has and upscale it, reading as grainy.
+struct CapturedImage {
+    let cgImage: CGImage
+    let scale: CGFloat
+}
+
 @MainActor
 final class CaptureEngine {
 
+    private let settings: AppSettings
+
+    init(settings: AppSettings = .shared) {
+        self.settings = settings
+    }
+
     /// Captures a screenshot for the given mode.
     ///
-    /// - Returns: The captured image at native (pixel) resolution, or `nil`
-    ///   if Screen Recording access is missing or the user cancelled the
-    ///   selection (Esc).
-    func capture(_ mode: CaptureMode) async -> CGImage? {
+    /// - Returns: The captured image at native (pixel) resolution together
+    ///   with the pixels-per-point scale baked into those dimensions, or
+    ///   `nil` if Screen Recording access is missing or the user cancelled
+    ///   the selection (Esc).
+    func capture(_ mode: CaptureMode) async -> CapturedImage? {
         guard ScreenRecordingPermission.requestIfNeededAndVerify() else {
             return nil
         }
@@ -33,7 +53,7 @@ final class CaptureEngine {
 
     // MARK: - Full screen
 
-    private func captureFullScreen() async -> CGImage? {
+    private func captureFullScreen() async -> CapturedImage? {
         guard let content = await shareableContent() else { return nil }
 
         // `NSScreen.main` (the screen holding the currently-focused window),
@@ -56,12 +76,12 @@ final class CaptureEngine {
         configuration.width = Int(CGFloat(display.width) * scale)
         configuration.height = Int(CGFloat(display.height) * scale)
 
-        return await capturedImage(filter: filter, configuration: configuration, context: "full-screen")
+        return await capturedImage(filter: filter, configuration: configuration, baseScale: scale, context: "full-screen")
     }
 
     // MARK: - Window
 
-    private func captureWindow() async -> CGImage? {
+    private func captureWindow() async -> CapturedImage? {
         guard let content = await shareableContent() else { return nil }
 
         let ownWindowIDs = Set(ownWindows(from: content).map(\.windowID))
@@ -80,12 +100,12 @@ final class CaptureEngine {
         configuration.width = max(1, Int(chosen.frame.width * scale))
         configuration.height = max(1, Int(chosen.frame.height * scale))
 
-        return await capturedImage(filter: filter, configuration: configuration, context: "window")
+        return await capturedImage(filter: filter, configuration: configuration, baseScale: scale, context: "window")
     }
 
     // MARK: - Area
 
-    private func captureArea() async -> CGImage? {
+    private func captureArea() async -> CapturedImage? {
         guard let selection = await RegionSelectionOverlayWindow.present() else {
             return nil
         }
@@ -115,7 +135,7 @@ final class CaptureEngine {
         configuration.width = max(1, Int((sourceRect.width * scale).rounded()))
         configuration.height = max(1, Int((sourceRect.height * scale).rounded()))
 
-        return await capturedImage(filter: filter, configuration: configuration, context: "area")
+        return await capturedImage(filter: filter, configuration: configuration, baseScale: scale, context: "area")
     }
 
     // MARK: - Shared helpers
@@ -136,13 +156,22 @@ final class CaptureEngine {
         return content.windows.filter { $0.owningApplication?.processID == ownProcessID }
     }
 
+    /// Captures via ScreenCaptureKit at `baseScale` (the display's native
+    /// `backingScaleFactor`), then applies any extra `CaptureResolution`
+    /// supersampling as a post-capture upscale -- see `ImageUpscaler`.
     private func capturedImage(
         filter: SCContentFilter,
         configuration: SCStreamConfiguration,
+        baseScale: CGFloat,
         context: String
-    ) async -> CGImage? {
+    ) async -> CapturedImage? {
         do {
-            return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            let supersampleFactor = settings.captureResolution.supersampleFactor
+            guard let upscaled = ImageUpscaler.upscale(cgImage, factor: supersampleFactor) else {
+                return CapturedImage(cgImage: cgImage, scale: baseScale)
+            }
+            return CapturedImage(cgImage: upscaled, scale: baseScale * supersampleFactor)
         } catch {
             NSLog("Snaplet: \(context) capture failed: \(error)")
             return nil
